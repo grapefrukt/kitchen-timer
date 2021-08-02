@@ -6,6 +6,8 @@
 #include "kitchen_font.h"
 #include "pitches.h"
 #include "toneAC.h"
+#include "music.h"
+#include "music_data.h"
 
 #define PIN_ENCODER_A      18
 #define PIN_ENCODER_B      19
@@ -36,7 +38,7 @@ elapsedMillis timerSeconds;
 elapsedMillis timeSinceInput;
 elapsedMillis timeSinceAlarmOff;
 
-int time = 1;
+int time = 0;
 bool bufferSwapper = true;
 int alarmActive = false;
 
@@ -69,6 +71,8 @@ void wakeUp(){
   timeSinceInput = WAIT_AFTER_INPUT_MS;
   timeSinceAlarmOff = IGNORE_TIMER_SET_AFTER_ALARM_MS;
   refreshScreen();
+
+  // playMelody(melody_cantina, size_cantina);
 }
 
 void swapBuffers(){
@@ -199,11 +203,12 @@ void onStartTimer(){
 void refreshScreen(){
   if (alarmActive){
     int frame = millis() / 100;
+    int frameHalf = millis() / 200;
 
-    matrix.setCursor(3 - frame % 4, 8);
+    matrix.setCursor(3 - frameHalf % 4, 8);
     matrix.print(";");
 
-    matrix.setCursor(11 + frame % 4, 8);
+    matrix.setCursor(11 + frameHalf % 4, 8);
     matrix.print("<");
     
     matrix.setCursor(5 + (frame % 2 == 0 ? 0 : -1), 8);
@@ -244,6 +249,8 @@ void refreshScreen(){
 }
 
 void loop() {
+  updateMusic();
+
   readRotaryEncoder();
   if (pushbutton.update() && pushbutton.fallingEdge()) onButton();
   if (timerSeconds >= MS_IN_A_SECOND) {
