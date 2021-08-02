@@ -36,11 +36,17 @@ elapsedMillis timerSeconds;
 elapsedMillis timeSinceInput;
 elapsedMillis timeSinceAlarmOff;
 
-int minutes = 0;
-int seconds = 1;
+int time = 1;
 bool bufferSwapper = true;
-
 int alarmActive = false;
+
+int seconds() {
+  return time % 60;
+}
+
+int minutes(){
+  return time / 60;
+}
 
 void setup() {
   Serial.begin(9600);
@@ -117,11 +123,9 @@ void onRotary(int delta, int position){
   if (delta > 0) toneAC(position % 2 == 0 ? NOTE_C7 : NOTE_D7, volume, duration, background);
   else toneAC(position % 2 == 0 ? NOTE_C7 : NOTE_B6, volume, duration, background);
 
-  minutes += delta;
-  //if (delta > 0) seconds = MAX_SECONDS;
-  if (minutes < 0) minutes = 0;
-  if (minutes == 0 && delta < 0) seconds = 0;
-
+  time += delta * 60;
+  if (time < 0) time = 0;
+  
   timeSinceInput = 0;
   alarmActive = 0;
 
@@ -130,7 +134,7 @@ void onRotary(int delta, int position){
 
 void onButton(){
   if (alarmActive) dismissAlarm();
-  else seconds = 1;
+  else time = 2;
 }
 
 void dismissAlarm(){
@@ -143,7 +147,7 @@ void dismissAlarm(){
 bool waitOnLastFrame = false;
 void onTick(){
   if (alarmActive) onAlarm(false);
-  if (minutes == 0 && seconds == 0) return;
+  if (time == 0) return;
 
   // don't count time when the user is inputting
   if (timeSinceInput < WAIT_AFTER_INPUT_MS){
@@ -155,15 +159,12 @@ void onTick(){
     return;
   }
    
-  seconds -= 1;
-  if (seconds < 0) {
-    minutes -= 1;
-    if (minutes < 0) minutes = 0;
-    seconds = MAX_SECONDS;
-  }
+  time -= 1;
+  if (time < 0) time = 0;
 
   refreshScreen();
-  if (seconds == 0 && minutes == 0) onAlarm(true);
+
+  if (time == 0) onAlarm(true);
 }
 
 
@@ -204,25 +205,26 @@ void refreshScreen(){
     return;
   }
   
-  if (minutes > 0) {
-    matrix.print(minutes);
 
-    if (minutes > 9){
+  if (minutes() > 0) {
+    matrix.print(minutes());
+
+    if (minutes() > 9){
       matrix.print("m"); 
     } else {
       matrix.print(":");
     }
   }
   
-  if (seconds < 10) matrix.print(0);
-  matrix.print(seconds);
-  if (minutes == 0) matrix.print("s");
+  if (seconds() < 10) matrix.print(0);
+  matrix.print(seconds());
+  if (minutes() == 0) matrix.print("s");
   
-  if (seconds > 0) {
+  if (seconds() > 0) {
     const int barY = 8;
-    int lastBarPixelX = seconds / 4;
+    int lastBarPixelX = seconds() / 4;
     matrix.drawLine(0, barY, lastBarPixelX, barY, BRIGHTNESS);
-    matrix.drawLine(lastBarPixelX + 1, barY, lastBarPixelX + 1, barY, seconds % 2 == 0 ? BRIGHTNESS_EXTRA : BRIGHTNESS_HALF);
+    matrix.drawLine(lastBarPixelX + 1, barY, lastBarPixelX + 1, barY, seconds() % 2 == 0 ? BRIGHTNESS_EXTRA : BRIGHTNESS_HALF);
   }
   
   swapBuffers();
