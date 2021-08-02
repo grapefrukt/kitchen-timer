@@ -118,7 +118,7 @@ void onRotary(int delta, int position){
   }
 
   // if we recently turned off the alarm, ignore inputs for a bit
-  if (timeSinceAlarmOff < IGNORE_TIMER_SET_AFTER_ALARM_MS) return;
+  if (alarmRecentlyOff()) return;
   
   if (delta > 0) toneAC(position % 2 == 0 ? NOTE_C7 : NOTE_D7, volume, duration, background);
   else toneAC(position % 2 == 0 ? NOTE_C7 : NOTE_B6, volume, duration, background);
@@ -130,6 +130,10 @@ void onRotary(int delta, int position){
   alarmActive = 0;
 
   refreshScreen();
+}
+
+bool alarmRecentlyOff(){
+  return timeSinceAlarmOff < IGNORE_TIMER_SET_AFTER_ALARM_MS;
 }
 
 void onButton(){
@@ -147,7 +151,10 @@ void dismissAlarm(){
 bool waitOnLastFrame = false;
 void onTick(){
   if (alarmActive) onAlarm(false);
-  if (time == 0) return;
+  if (time == 0) {
+    refreshScreen();
+    return;
+  }
 
   // don't count time when the user is inputting
   if (timeSinceInput < WAIT_AFTER_INPUT_MS){
@@ -204,6 +211,12 @@ void refreshScreen(){
     swapBuffers();
     return;
   }
+
+  if (alarmRecentlyOff()) {
+    matrix.print("ok");
+    swapBuffers();
+    return;
+  }
   
 
   if (minutes() > 0) {
@@ -238,7 +251,7 @@ void loop() {
     timerSeconds -= MS_IN_A_SECOND;
   }
 
-  if (alarmActive) refreshScreen();
+  if (alarmActive || alarmRecentlyOff()) refreshScreen();
 }
 
 void sfxConfirm(){
