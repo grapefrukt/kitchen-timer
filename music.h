@@ -4,13 +4,14 @@
 #include "pitches.h"
 
 typedef struct {
-    int* data;
+    const int* data;
     int size;
     int tempo;
 } Melody;
 
 
 void playMelody(Melody melody);
-void updateMusic();
+void updateMelody();
+void stopMelody();
 
 #endif

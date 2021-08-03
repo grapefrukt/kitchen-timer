@@ -38,7 +38,7 @@ elapsedMillis timerSeconds;
 elapsedMillis timeSinceInput;
 elapsedMillis timeSinceAlarmOff;
 
-int time = 0;
+int time = 2;
 bool bufferSwapper = true;
 int alarmActive = false;
 
@@ -71,8 +71,6 @@ void wakeUp(){
   timeSinceInput = WAIT_AFTER_INPUT_MS;
   timeSinceAlarmOff = IGNORE_TIMER_SET_AFTER_ALARM_MS;
   refreshScreen();
-
-  playMelody(melody_cantina);
 }
 
 void swapBuffers(){
@@ -183,9 +181,9 @@ void onAlarm(bool setActive){
   if (setActive) alarmActive = ALARM_DURATION_SECONDS;
   else alarmActive--;
   
-  if (alarmActive % 2 == 0) return;
+  if (alarmActive % 2 == 1) return;
 
-  const int volume = 8;
+  /*const int volume = 8;
   const int duration = 50;
   const bool background = false;
   for (int i = 0; i < 3; i++){
@@ -193,7 +191,9 @@ void onAlarm(bool setActive){
     toneAC(NOTE_B7, volume, duration, background);
     toneAC(NOTE_D8, volume, duration, background);
     delay(50);
-  }
+  }*/
+
+  playMelody(melody_alarm);
 }
 
 void onStartTimer(){
@@ -249,7 +249,7 @@ void refreshScreen(){
 }
 
 void loop() {
-  updateMusic();
+  updateMelody();
 
   readRotaryEncoder();
   if (pushbutton.update() && pushbutton.fallingEdge()) onButton();

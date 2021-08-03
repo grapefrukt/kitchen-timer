@@ -7,11 +7,11 @@ int index = -1;
 // this calculates the duration of a whole note in ms
 int wholenote = 0;
 int noteDuration = 0;
-int volume = 1;
+int volume = 8;
 
 elapsedMillis musicTimer;
 
-void updateMusic(){
+void updateMelody(){
   if ((int) musicTimer < noteDuration) return;
   if (index < 0) return;
 
@@ -31,10 +31,10 @@ void updateMusic(){
 
   // we only play the note for 90% of the duration, leaving 10% as a pause
   if (melody.data[index] == REST) noToneAC();
-  else toneAC(melody.data[index], volume, noteDuration * 0.9, true);
+  else toneAC(melody.data[index], volume, noteDuration * .9, true);
 
   // if we're at the end of the song, stop
-  if (index + 2 >= melody.size * 2) index = -1;
+  if (index + 2 >= melody.size * 2) stopMelody();
   // move the playhead to the next note
   else index += 2;
 }
@@ -43,4 +43,10 @@ void playMelody(Melody newMelody) {
   melody = newMelody;
   wholenote = (60000 * 4) / melody.tempo;
   index = 0;
+  musicTimer = 0;
+  noteDuration = 0;
+}
+
+void stopMelody() {
+  index = -1;
 }
