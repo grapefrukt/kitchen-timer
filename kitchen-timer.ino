@@ -182,17 +182,6 @@ void onAlarm(bool setActive){
   else alarmActive--;
   
   if (alarmActive % 2 == 1) return;
-
-  /*const int volume = 8;
-  const int duration = 50;
-  const bool background = false;
-  for (int i = 0; i < 3; i++){
-    toneAC(NOTE_C8, volume, duration, background);
-    toneAC(NOTE_B7, volume, duration, background);
-    toneAC(NOTE_D8, volume, duration, background);
-    delay(50);
-  }*/
-
   playMelody(melody_alarm);
 }
 
@@ -204,11 +193,12 @@ void refreshScreen(){
   if (alarmActive){
     int frame = millis() / 100;
     int frameHalf = millis() / 200;
+    int frameHalfOffset = millis() / 200 + 100;
 
     matrix.setCursor(3 - frameHalf % 4, 8);
     matrix.print(";");
 
-    matrix.setCursor(11 + frameHalf % 4, 8);
+    matrix.setCursor(11 + frameHalfOffset % 4, 8);
     matrix.print("<");
     
     matrix.setCursor(5 + (frame % 2 == 0 ? 0 : -1), 8);

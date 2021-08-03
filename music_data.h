@@ -8,8 +8,7 @@ const int alarm[] = {
   NOTE_C8, 4, NOTE_B7, 4, NOTE_D8, 4, REST, 4,
 };
 
-MELODY(alarm, 800)
-
+MELODY(alarm, 900)
 
 const int cantina[] = {
   // Cantina Band - Star wars 
