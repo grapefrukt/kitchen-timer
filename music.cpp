@@ -7,7 +7,6 @@ int index = -1;
 // this calculates the duration of a whole note in ms
 int wholenote = 0;
 int noteDuration = 0;
-int volume = 8;
 
 elapsedMillis musicTimer;
 
@@ -31,7 +30,7 @@ void updateMelody(){
 
   // we only play the note for 90% of the duration, leaving 10% as a pause
   if (melody.data[index] == REST) noToneAC();
-  else toneAC(melody.data[index], volume, noteDuration * .9, true);
+  else toneAC(melody.data[index], melody.volume, noteDuration * .9, true);
 
   // if we're at the end of the song, stop
   if (index + 2 >= melody.size * 2) stopMelody();

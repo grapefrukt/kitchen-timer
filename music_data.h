@@ -1,6 +1,6 @@
 #include "music.h"
 
-#define MELODY(x,y) Melody melody_##x = { x, sizeof(x) / sizeof(x[0]) / 2, y};
+#define MELODY(name,tempo,volume) Melody melody_##name = { name, sizeof(name) / sizeof(name[0]) / 2, tempo, volume};
 
 const int alarm[] = {
   NOTE_C8, 4, NOTE_B7, 4, NOTE_D8, 4, REST, 4,
@@ -8,7 +8,20 @@ const int alarm[] = {
   NOTE_C8, 4, NOTE_B7, 4, NOTE_D8, 4, REST, 4,
 };
 
-MELODY(alarm, 900)
+MELODY(alarm, 900, 9)
+
+const int timer_start[] = {
+  NOTE_C6, 4, NOTE_D6, 4, REST, 4,
+  NOTE_C6, 4, NOTE_D6, 4, REST, 4,
+};
+
+MELODY(timer_start, 2000, 4)
+
+const int timer_dismiss[] = {
+  NOTE_D5, 4, NOTE_C5, 4, NOTE_D5, 4, REST, 4,
+};
+
+MELODY(timer_dismiss, 900, 3)
 
 const int cantina[] = {
   // Cantina Band - Star wars 
@@ -34,7 +47,7 @@ const int cantina[] = {
 
 // Melody melody_cantina = { cantina, sizeof(cantina) / sizeof(cantina[0]) / 2, 144};
 
-MELODY(cantina, 144)
+MELODY(cantina, 144, 8)
 
 const int tetris[] = {
 
@@ -51,7 +64,7 @@ const int tetris[] = {
   NOTE_C5, 4,  NOTE_A4,4,  NOTE_A4,4, REST, 4,
 };
 
-MELODY(tetris, 144)
+MELODY(tetris, 144, 8)
 
 const int mii_channel[] = {
   
@@ -130,7 +143,7 @@ const int mii_channel[] = {
    
 };
 
-MELODY(mii_channel, 114)
+MELODY(mii_channel, 114, 8)
 
 const int nevergonnagive[] = {
     // Never Gonna Give You Up - Rick Astley
@@ -205,4 +218,18 @@ const int nevergonnagive[] = {
   NOTE_E5,4, NOTE_D5,2, REST,4
 };
 
-MELODY(nevergonnagive, 114)
+MELODY(nevergonnagive, 114, 8)
+
+
+int nokia[] = {
+
+  // Nokia Ringtone 
+  // Score available at https://musescore.com/user/29944637/scores/5266155
+  
+  NOTE_E5, 8, NOTE_D5, 8, NOTE_FS4, 4, NOTE_GS4, 4, 
+  NOTE_CS5, 8, NOTE_B4, 8, NOTE_D4, 4, NOTE_E4, 4, 
+  NOTE_B4, 8, NOTE_A4, 8, NOTE_CS4, 4, NOTE_E4, 4,
+  NOTE_A4, 2, 
+};
+
+MELODY(nokia, 180, 8)

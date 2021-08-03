@@ -7,6 +7,7 @@ typedef struct {
     const int* data;
     int size;
     int tempo;
+    int volume;
 } Melody;
 
 

@@ -3,6 +3,7 @@
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_IS31FL3731.h>
+#include <avr/sleep.h>
 #include "kitchen_font.h"
 #include "pitches.h"
 #include "toneAC.h"
@@ -12,7 +13,6 @@
 #define PIN_ENCODER_A      18
 #define PIN_ENCODER_B      19
 #define PIN_ENCODER_BUTTON 20
-#define PIN_PIEZO          25
 
 // useful to make the timer run faster
 #define MS_IN_A_SECOND 1000
@@ -38,9 +38,12 @@ elapsedMillis timerSeconds;
 elapsedMillis timeSinceInput;
 elapsedMillis timeSinceAlarmOff;
 
-int time = 2;
+int time = 0;
 bool bufferSwapper = true;
 int alarmActive = false;
+
+// this is set by the wake up interrupt, if this is 1 we run the wake up code the next loop()
+volatile bool wakeup_flag = false;
 
 int seconds() {
   return time % 60;
@@ -51,8 +54,16 @@ int minutes(){
 }
 
 void setup() {
-  Serial.begin(9600);
-  Serial.println("This kitchen timer speaks serial. That's unusual.");
+  // Serial.begin(9600);
+  // Serial.println("This kitchen timer speaks serial. That's unusual.");
+
+  // set all pins as outputs to save power
+  for (int i=0; i < 46; i++) {
+    if (i == PIN_ENCODER_A) continue;
+    if (i == PIN_ENCODER_B) continue;
+    if (i == PIN_ENCODER_BUTTON) continue;
+    pinMode(i, OUTPUT);
+  }
 
   pinMode(PIN_ENCODER_BUTTON, INPUT_PULLUP);
   
@@ -62,6 +73,8 @@ void setup() {
 }
 
 void wakeUp(){
+  wakeup_flag = false;
+  // Serial.println("wake up");
   matrix.setTextSize(1);
   matrix.setTextWrap(false);  // we dont want text to wrap so it scrolls nicely
   matrix.setTextColor(BRIGHTNESS);
@@ -123,9 +136,16 @@ void onRotary(int delta, int position){
   if (alarmRecentlyOff()) return;
   
   if (delta > 0) toneAC(position % 2 == 0 ? NOTE_C7 : NOTE_D7, volume, duration, background);
-  else toneAC(position % 2 == 0 ? NOTE_C7 : NOTE_B6, volume, duration, background);
+  else if (time > 0) toneAC(position % 2 == 0 ? NOTE_C7 : NOTE_B6, volume, duration, background);
 
-  time += delta * 60;
+  // 30 second steps up to 5 minutes, then 1 minute steps
+  if (time < 5 * 60) {
+    time += delta * 30;
+  } else {
+    time += delta * 60;  
+  }
+  
+  // don't go below zero
   if (time < 0) time = 0;
   
   timeSinceInput = 0;
@@ -141,12 +161,14 @@ bool alarmRecentlyOff(){
 void onButton(){
   if (alarmActive) dismissAlarm();
   else time = 2;
+  timeSinceInput = 0;
 }
 
 void dismissAlarm(){
   alarmActive = 0;
   timeSinceAlarmOff = 0;
-  sfxConfirm();
+  delay(100);
+  playMelody(melody_timer_dismiss);
   refreshScreen();
 }
 
@@ -186,7 +208,7 @@ void onAlarm(bool setActive){
 }
 
 void onStartTimer(){
-  sfxConfirm();
+  playMelody(melody_timer_start);
 }
 
 void refreshScreen(){
@@ -212,7 +234,18 @@ void refreshScreen(){
     swapBuffers();
     return;
   }
-  
+
+  if (time == 0) {
+    long frame = (millis() / 200) % 40;
+    matrix.setCursor(4, 7);
+    if (frame > 1) matrix.print("="); // eyes
+    matrix.setCursor(7, 7);
+    matrix.print("?"); // nose
+    matrix.setCursor(5, 13);
+    matrix.print(">"); // mouth
+    swapBuffers();
+    return;
+  }
 
   if (minutes() > 0) {
     matrix.print(minutes());
@@ -239,26 +272,40 @@ void refreshScreen(){
 }
 
 void loop() {
-  updateMelody();
+  if (wakeup_flag) wakeUp();
 
   readRotaryEncoder();
   if (pushbutton.update() && pushbutton.fallingEdge()) onButton();
+
   if (timerSeconds >= MS_IN_A_SECOND) {
     onTick();
     timerSeconds -= MS_IN_A_SECOND;
   }
 
-  if (alarmActive || alarmRecentlyOff()) refreshScreen();
+  if (alarmActive || alarmRecentlyOff() || time == 0) refreshScreen();
+  if (timeSinceInput > 3000 && time == 0) sleep();
+
+  updateMelody();
 }
 
-void sfxConfirm(){
-  const int volume = 3;
-  const int duration = 30;
-  const bool background = false;
+void sleep() {
+  attachInterrupt(PIN_ENCODER_BUTTON, wakeUpInterrupt, CHANGE); //LOW,RISING, FALLING,CHANGE
   
-  toneAC(NOTE_C6, volume, duration, background);
-  toneAC(NOTE_D6, volume, duration, background);
-  delay(30);
-  toneAC(NOTE_C6, volume, duration, background);
-  toneAC(NOTE_D6, volume, duration, background);
+  swapBuffers();
+
+  digitalWrite(6, HIGH);   // set the LED on
+
+ //Serial.end(); // shut off USB
+  ADCSRA = 0;   // shut off ADC
+  set_sleep_mode(SLEEP_MODE_PWR_DOWN);
+  noInterrupts(); 
+  sleep_enable();
+  interrupts(); 
+  sleep_cpu(); 
+  sleep_disable();
+  digitalWrite(6, LOW);   // set the LED off
+}
+
+void wakeUpInterrupt(){
+  wakeup_flag = true;
 }
