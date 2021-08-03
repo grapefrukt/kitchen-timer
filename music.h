@@ -3,7 +3,14 @@
 
 #include "pitches.h"
 
-void playMelody(int* melody, int size);
+typedef struct {
+    int* data;
+    int size;
+    int tempo;
+} Melody;
+
+
+void playMelody(Melody melody);
 void updateMusic();
 
 #endif

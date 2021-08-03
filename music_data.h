@@ -1,4 +1,8 @@
-int melody_cantina[] = {
+#include "music.h"
+
+#define MELODY(x,y) Melody melody_##x = { x, sizeof(x) / sizeof(x[0]) / 2, y};
+
+int cantina[] = {
   // Cantina Band - Star wars 
   // Score available at https://musescore.com/user/6795541/scores/1606876
   NOTE_B4,-4, NOTE_E5,-4, NOTE_B4,-4, NOTE_E5,-4, 
@@ -20,9 +24,11 @@ int melody_cantina[] = {
   NOTE_F5, -4, NOTE_E5,-4, NOTE_AS4,8, NOTE_AS4,8, NOTE_B4,4, NOTE_G4,4, 
 };
 
-int size_cantina = sizeof(melody_cantina) / sizeof(melody_cantina[0]) / 2;
+// Melody melody_cantina = { cantina, sizeof(cantina) / sizeof(cantina[0]) / 2, 144};
 
-int melody_tetris[] = {
+MELODY(cantina, 144)
+
+int tetris[] = {
 
   //Based on the arrangement at https://www.flutetunes.com/tunes.php?id=192
   
@@ -37,5 +43,4 @@ int melody_tetris[] = {
   NOTE_C5, 4,  NOTE_A4,4,  NOTE_A4,4, REST, 4,
 };
 
-
-int size_tetris = sizeof(melody_tetris) / sizeof(melody_tetris[0]) / 2;
+MELODY(tetris, 144)

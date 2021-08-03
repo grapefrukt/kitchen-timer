@@ -1,28 +1,24 @@
 #include "music.h"
 #include "toneAC.h"
 
-int *melody;
-int melodySize;
-int index;
-
-// change this to make the song slower or faster
-int tempo = 144;
+Melody melody;
+int index = -1;
 
 // this calculates the duration of a whole note in ms
-int wholenote = (60000 * 4) / tempo;
+int wholenote = 0;
 int noteDuration = 0;
 int volume = 1;
 
 elapsedMillis musicTimer;
 
 void updateMusic(){
-  if (musicTimer < (int) noteDuration) return;
-  if (melody == NULL) return;
+  if ((int) musicTimer < noteDuration) return;
+  if (index < 0) return;
 
   musicTimer -= noteDuration;
   
   // calculates the duration of each note
-  int divider = melody[index + 1];
+  int divider = melody.data[index + 1];
 
   if (divider > 0) {
     // regular note, just proceed
@@ -34,18 +30,17 @@ void updateMusic(){
   }
 
   // we only play the note for 90% of the duration, leaving 10% as a pause
-  if (melody[index] == REST) noToneAC();
-  else toneAC(melody[index], volume, noteDuration * 0.9, true);
+  if (melody.data[index] == REST) noToneAC();
+  else toneAC(melody.data[index], volume, noteDuration * 0.9, true);
 
   // if we're at the end of the song, stop
-  if (index + 2 >= melodySize * 2) melody = NULL;
-
+  if (index + 2 >= melody.size * 2) index = -1;
   // move the playhead to the next note
-  index += 2;
+  else index += 2;
 }
 
-void playMelody(int* newMelody, int newSize) {
+void playMelody(Melody newMelody) {
   melody = newMelody;
-  melodySize = newSize;
+  wholenote = (60000 * 4) / melody.tempo;
   index = 0;
 }

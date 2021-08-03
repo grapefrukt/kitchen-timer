@@ -72,7 +72,7 @@ void wakeUp(){
   timeSinceAlarmOff = IGNORE_TIMER_SET_AFTER_ALARM_MS;
   refreshScreen();
 
-  // playMelody(melody_cantina, size_cantina);
+  playMelody(melody_cantina);
 }
 
 void swapBuffers(){
