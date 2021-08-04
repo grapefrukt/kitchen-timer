@@ -205,7 +205,6 @@ void onTick(){
   if (time == 0) onAlarm(true);
 }
 
-
 void onAlarm(bool setActive){
   if (setActive) alarmActive = ALARM_DURATION_SECONDS;
   else alarmActive--;
@@ -219,6 +218,7 @@ void onStartTimer(){
 }
 
 void refreshScreen(){
+  // play alarm animation
   if (alarmActive){
     int frame = millis() / 100;
     int frameHalf = millis() / 200;
@@ -236,12 +236,15 @@ void refreshScreen(){
     return;
   }
 
+  // alarm's just been turned off, show a little confirm message
   if (alarmRecentlyOff()) {
+    matrix.setCursor(4, 7);
     matrix.print("ok");
     swapBuffers();
     return;
   }
 
+  // we're idle, show a cute face
   if (time == 0) {
     long frame = (millis() / 200) % 40;
     matrix.setCursor(4, 7);
@@ -254,6 +257,7 @@ void refreshScreen(){
     return;
   }
 
+  // timer is active, show the timer digits
   if (minutes() > 0) {
     matrix.print(minutes());
 
@@ -290,7 +294,7 @@ void loop() {
   }
 
   if (alarmActive || alarmRecentlyOff() || time == 0) refreshScreen();
-  if (timeSinceInput > 3000 && time == 0 && alarmActive == 0) sleep();
+  if (timeSinceInput > SLEEP_AFTER_MS && time == 0 && alarmActive == 0) sleep();
 
   updateMelody();
 }
@@ -302,7 +306,7 @@ void sleep() {
 
   inSleep = true;
 
- //Serial.end(); // shut off USB
+  Serial.end(); // shut off USB
   ADCSRA = 0;   // shut off ADC
   set_sleep_mode(SLEEP_MODE_PWR_DOWN);
   noInterrupts(); 
