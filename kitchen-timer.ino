@@ -54,6 +54,8 @@ int alarmActive = 0;
 // keep track of where the encoder was last update
 long encoderPosition = 0;
 
+long lastFrame = 0;
+
 // this is set by the wake up interrupt, if this is 1 we run the wake up code the next loop()
 volatile bool inWakeUp = false;
 volatile bool inSleep = false;
@@ -143,9 +145,7 @@ void readRotaryEncoder(){
 }
 
 void onRotary(int delta, int position){
-  const int volume = 5;
-  const int duration = 5;
-  const bool background = true;
+
   
   timeSinceInput = 0;
 
@@ -157,7 +157,10 @@ void onRotary(int delta, int position){
 
   // if we recently turned off the alarm, ignore inputs for a bit
   if (alarmRecentlyOff()) return;
-  
+
+  const int volume = 5;
+  const int duration = 5;
+  const bool background = true;
   if (delta > 0) toneAC(position % 2 == 0 ? NOTE_C7 : NOTE_D7, volume, duration, background);
   else if (time > 0) toneAC(position % 2 == 0 ? NOTE_C7 : NOTE_B6, volume, duration, background);
 
@@ -226,11 +229,13 @@ void onStartTimer(){
 }
 
 void refreshScreen(){
+  long currentFrame = frame();
+  if (currentFrame == lastFrame) return;
+  
   // play alarm animation
   if (alarmActive){
-    int frame = millis() / 100;
-    int frameHalf = millis() / 200;
-    int frameHalfOffset = millis() / 200 + 100;
+    int frameHalf = currentFrame / 2;
+    int frameHalfOffset = currentFrame / 2 + 50;
 
     matrix.setCursor(3 - frameHalf % 4, 8);
     matrix.print(";");
@@ -238,7 +243,7 @@ void refreshScreen(){
     matrix.setCursor(11 + frameHalfOffset % 4, 8);
     matrix.print("<");
     
-    matrix.setCursor(5 + (frame % 2 == 0 ? 0 : -1), 8);
+    matrix.setCursor(5 + (currentFrame % 2 == 0 ? 0 : -1), 8);
     matrix.print("@");
     swapBuffers();
     return;
@@ -254,7 +259,7 @@ void refreshScreen(){
 
   // we're idle, show a cute face
   if (time == 0) {
-    long frame = (millis() / 200) % 40;
+    long frame = currentFrame % 40;
     matrix.setCursor(4, 7);
     if (frame > 1) matrix.print("="); // eyes
     matrix.setCursor(7, 7);
@@ -339,6 +344,10 @@ int seconds() {
 
 int minutes(){
   return time / 60;
+}
+
+long frame() {
+  return millis() / 100;
 }
 
 bool alarmRecentlyOff(){
