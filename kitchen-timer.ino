@@ -1,5 +1,5 @@
 // can't make the encoder interrupts play nice with the wake up from sleep interrupt, so i have to disable them
-#define ENCODER_DO_NOT_USE_INTERRUPTS
+// #define ENCODER_DO_NOT_USE_INTERRUPTS
 #include <Encoder.h>
 #include <Bounce.h>
 #include <Wire.h>
@@ -78,7 +78,8 @@ void setup() {
 
   // set up an interrupt on one of the encoder pins (they both change as it turns, so one is enough)
   // this can wake the teensy even if it's asleep
-  attachInterrupt(digitalPinToInterrupt(PIN_ENCODER_A), wakeUpInterrupt, CHANGE);
+  // attachInterrupt(digitalPinToInterrupt(PIN_ENCODER_A), wakeUpInterrupt, CHANGE);
+  // attachInterrupt(digitalPinToInterrupt(PIN_ENCODER_B), wakeUpInterrupt, CHANGE);
 
   // set up the pullup for the encoder push-button
   pinMode(PIN_ENCODER_BUTTON, INPUT_PULLUP);
@@ -119,6 +120,7 @@ void swapBuffers(){
   matrix.setFrame(bufferSwapper ? 0 : 1);
   matrix.clear();
   matrix.setCursor(0, 7); 
+  if (bufferSwapper) matrix.drawPixel(15, 0, 255);
 }
 
 void readRotaryEncoder(){
@@ -126,7 +128,7 @@ void readRotaryEncoder(){
   long newPosition = rotaryEncoder.read();
   // look at how far we've moved since last update
   int delta = newPosition - encoderPosition;
-  
+
   int direction = delta > 0 ? 1 : -1;
   delta = abs(delta);
   
@@ -145,8 +147,6 @@ void readRotaryEncoder(){
 }
 
 void onRotary(int delta, int position){
-
-  
   timeSinceInput = 0;
 
   // if the alarm is going off, the knob won't change anything
@@ -174,7 +174,7 @@ void onRotary(int delta, int position){
   // don't go below zero
   if (time < 0) time = 0;
   
-  refreshScreen();
+  refreshScreen(true);
 }
 
 void onButton(){
@@ -211,7 +211,7 @@ void onTick(){
   time -= 1;
   if (time < 0) time = 0;
 
-  refreshScreen();
+  refreshScreen(true);
 
   if (time == 0) onAlarm(true);
 }
@@ -229,8 +229,13 @@ void onStartTimer(){
 }
 
 void refreshScreen(){
+  refreshScreen(false);
+}
+
+void refreshScreen(bool force){
   long currentFrame = frame();
-  if (currentFrame == lastFrame) return;
+  if (currentFrame == lastFrame && !force) return;
+  lastFrame = currentFrame;
   
   // play alarm animation
   if (alarmActive){
@@ -313,6 +318,10 @@ void loop() {
 }
 
 void sleep() {
+  return; // NO SLEEP!
+ 
+
+  
   digitalWrite(PIN_SLEEP_LED, HIGH);   // set the LED on
 
   inSleep = true;
