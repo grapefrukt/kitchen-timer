@@ -16,6 +16,7 @@
 #define PIN_ENCODER_B       3
 #define PIN_ENCODER_BUTTON 19
 #define PIN_SLEEP_LED       6
+#define PIN_SLEEP_SCREEN    17
 
 // useful to make the timer run faster
 #define MS_IN_A_SECOND 1000
@@ -58,6 +59,9 @@ volatile bool inWakeUp = false;
 volatile bool inSleep = false;
 
 void setup() {
+ 
+  delay(300);
+  
   // Serial.begin(9600);
   // Serial.println("This kitchen timer speaks serial. That's unusual.");
 
@@ -66,6 +70,7 @@ void setup() {
     if (i == PIN_ENCODER_A) continue;
     if (i == PIN_ENCODER_B) continue;
     if (i == PIN_ENCODER_BUTTON) continue;
+    if (i == PIN_SLEEP_SCREEN) continue;
     pinMode(i, OUTPUT);
   }
 
@@ -84,6 +89,9 @@ void setup() {
 
 void wakeUp(){
   inWakeUp = false;
+  
+  digitalWrite(PIN_SLEEP_LED, LOW);   // set the LED off
+  digitalWrite(PIN_SLEEP_SCREEN, HIGH);
    
   matrix.setTextSize(1);
   matrix.setTextWrap(false);  // we dont want text to wrap so it scrolls nicely
@@ -300,11 +308,14 @@ void loop() {
 }
 
 void sleep() {
-  swapBuffers();
-
   digitalWrite(PIN_SLEEP_LED, HIGH);   // set the LED on
 
   inSleep = true;
+
+  // setting the pin mode triggers some kind of sleep thing on the screen, so i only do it here
+  // not in setup. this seems to work well. 
+  pinMode(PIN_SLEEP_SCREEN, OUTPUT);
+  digitalWrite(PIN_SLEEP_SCREEN, LOW);
 
   Serial.end(); // shut off USB
   ADCSRA = 0;   // shut off ADC
@@ -314,7 +325,6 @@ void sleep() {
   interrupts(); 
   sleep_cpu(); // cpu goes to sleep here
   sleep_disable(); // this is where we come back in again after sleeping
-  digitalWrite(PIN_SLEEP_LED, LOW);   // set the LED off
 }
 
 void wakeUpInterrupt(){
