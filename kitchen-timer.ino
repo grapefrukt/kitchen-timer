@@ -1,3 +1,5 @@
+// can't make the encoder interrupts play nice with the wake up from sleep interrupt, so i have to disable them
+#define ENCODER_DO_NOT_USE_INTERRUPTS
 #include <Encoder.h>
 #include <Bounce.h>
 #include <Wire.h>
@@ -10,54 +12,56 @@
 #include "music.h"
 #include "music_data.h"
 
-#define PIN_ENCODER_A      18
-#define PIN_ENCODER_B      19
-#define PIN_ENCODER_BUTTON 20
+#define PIN_ENCODER_A       2
+#define PIN_ENCODER_B       3
+#define PIN_ENCODER_BUTTON 19
+#define PIN_SLEEP_LED       6
 
 // useful to make the timer run faster
 #define MS_IN_A_SECOND 1000
 
-#define MAX_SECONDS 59
-
-#define BRIGHTNESS 16
-#define BRIGHTNESS_HALF 8
+#define BRIGHTNESS       16
+#define BRIGHTNESS_HALF   8
 #define BRIGHTNESS_EXTRA 32
 
+// how long to sound the alarm, after this, we just give up and go back to sleep
 #define ALARM_DURATION_SECONDS 30
 
 // how long to wait after user input stops before starting the timer
-#define WAIT_AFTER_INPUT_MS 1000 
-#define IGNORE_TIMER_SET_AFTER_ALARM_MS 1000 
+#define WAIT_AFTER_INPUT_MS              1000
+// ignore user inputs for a bit after turning of the alarm as to not set a new time immediately
+#define IGNORE_TIMER_SET_AFTER_ALARM_MS  1000 
+// how long to wait without user input before going to sleep
+#define SLEEP_AFTER_MS                   3000 
 
 Adafruit_IS31FL3731 matrix = Adafruit_IS31FL3731();
-
-Encoder rotaryEncoder(PIN_ENCODER_A, PIN_ENCODER_B);
-Bounce pushbutton = Bounce(PIN_ENCODER_BUTTON, 10);  // 10 ms debounce
+Encoder rotaryEncoder = Encoder(PIN_ENCODER_A, PIN_ENCODER_B);
+Bounce  pushbutton    = Bounce(PIN_ENCODER_BUTTON, 10);  // 10 ms debounce
 
 elapsedMillis timerSeconds;
 elapsedMillis timeSinceInput;
 elapsedMillis timeSinceAlarmOff;
 
+// the main time keeping variable
 int time = 0;
+// this is used for the double buffering of the display, swaps between 0/1 each update
 bool bufferSwapper = true;
-int alarmActive = false;
+
+// is the alarm active? is set to the number of seconds the alarm will sound and decrements until zero
+int alarmActive = 0;
+
+// keep track of where the encoder was last update
+long encoderPosition = 0;
 
 // this is set by the wake up interrupt, if this is 1 we run the wake up code the next loop()
-volatile bool wakeup_flag = false;
-
-int seconds() {
-  return time % 60;
-}
-
-int minutes(){
-  return time / 60;
-}
+volatile bool inWakeUp = false;
+volatile bool inSleep = false;
 
 void setup() {
   // Serial.begin(9600);
   // Serial.println("This kitchen timer speaks serial. That's unusual.");
 
-  // set all pins as outputs to save power
+  // set all pins as outputs to save power (this is a teensy 2.0 thing)
   for (int i=0; i < 46; i++) {
     if (i == PIN_ENCODER_A) continue;
     if (i == PIN_ENCODER_B) continue;
@@ -65,44 +69,53 @@ void setup() {
     pinMode(i, OUTPUT);
   }
 
+  // set up an interrupt on one of the encoder pins (they both change as it turns, so one is enough)
+  // this can wake the teensy even if it's asleep
+  attachInterrupt(digitalPinToInterrupt(PIN_ENCODER_A), wakeUpInterrupt, CHANGE);
+
+  // set up the pullup for the encoder push-button
   pinMode(PIN_ENCODER_BUTTON, INPUT_PULLUP);
-  
+
+  // initialize the screen
   if (!matrix.begin()) Serial.println("display not found");
 
   wakeUp();
 }
 
 void wakeUp(){
-  wakeup_flag = false;
-  // Serial.println("wake up");
+  inWakeUp = false;
+   
   matrix.setTextSize(1);
   matrix.setTextWrap(false);  // we dont want text to wrap so it scrolls nicely
   matrix.setTextColor(BRIGHTNESS);
   matrix.setFont(&kitchen_font);
   swapBuffers();
 
-  timeSinceInput = WAIT_AFTER_INPUT_MS;
+  timeSinceInput = 0;
   timeSinceAlarmOff = IGNORE_TIMER_SET_AFTER_ALARM_MS;
   refreshScreen();
 }
 
 void swapBuffers(){
   // this needs to be double buffered because the matrix refreshes so quickly it will flicker
-  matrix.displayFrame(bufferSwapper ? 0 : 1);
   
+  // we display what was the back buffer
+  matrix.displayFrame(bufferSwapper ? 0 : 1);
+
+  // swap them around
   bufferSwapper = !bufferSwapper;
+  
+  // and now we set what was the front buffer to be the target for any updates
   matrix.setFrame(bufferSwapper ? 0 : 1);
   matrix.clear();
   matrix.setCursor(0, 7); 
 }
 
-// keep track of where the encoder was last update
-long oldPosition = 0;
 void readRotaryEncoder(){
   // read the encoder
   long newPosition = rotaryEncoder.read();
   // look at how far we've moved since last update
-  int delta = newPosition - oldPosition;
+  int delta = newPosition - encoderPosition;
   
   int direction = delta > 0 ? 1 : -1;
   delta = abs(delta);
@@ -113,18 +126,20 @@ void readRotaryEncoder(){
   
   // update the old position, make sure this stays on multiples of four to match the encoder
   while (delta > 0) {
-    oldPosition += direction * 4;
+    encoderPosition += direction * 4;
     delta -= 4;
     ticks++;
   }
   // finally, call the onRotary function to tell it we've moved
-  onRotary(ticks * direction, oldPosition >> 2);
+  onRotary(ticks * direction, encoderPosition >> 2);
 }
 
 void onRotary(int delta, int position){
   const int volume = 5;
   const int duration = 5;
   const bool background = true;
+  
+  timeSinceInput = 0;
 
   // if the alarm is going off, the knob won't change anything
   if (alarmActive){
@@ -148,14 +163,7 @@ void onRotary(int delta, int position){
   // don't go below zero
   if (time < 0) time = 0;
   
-  timeSinceInput = 0;
-  alarmActive = 0;
-
   refreshScreen();
-}
-
-bool alarmRecentlyOff(){
-  return timeSinceAlarmOff < IGNORE_TIMER_SET_AFTER_ALARM_MS;
 }
 
 void onButton(){
@@ -167,7 +175,6 @@ void onButton(){
 void dismissAlarm(){
   alarmActive = 0;
   timeSinceAlarmOff = 0;
-  delay(100);
   playMelody(melody_timer_dismiss);
   refreshScreen();
 }
@@ -272,7 +279,7 @@ void refreshScreen(){
 }
 
 void loop() {
-  if (wakeup_flag) wakeUp();
+  if (inWakeUp) wakeUp();
 
   readRotaryEncoder();
   if (pushbutton.update() && pushbutton.fallingEdge()) onButton();
@@ -283,17 +290,17 @@ void loop() {
   }
 
   if (alarmActive || alarmRecentlyOff() || time == 0) refreshScreen();
-  if (timeSinceInput > 3000 && time == 0) sleep();
+  if (timeSinceInput > 3000 && time == 0 && alarmActive == 0) sleep();
 
   updateMelody();
 }
 
 void sleep() {
-  attachInterrupt(PIN_ENCODER_BUTTON, wakeUpInterrupt, CHANGE); //LOW,RISING, FALLING,CHANGE
-  
   swapBuffers();
 
-  digitalWrite(6, HIGH);   // set the LED on
+  digitalWrite(PIN_SLEEP_LED, HIGH);   // set the LED on
+
+  inSleep = true;
 
  //Serial.end(); // shut off USB
   ADCSRA = 0;   // shut off ADC
@@ -301,11 +308,25 @@ void sleep() {
   noInterrupts(); 
   sleep_enable();
   interrupts(); 
-  sleep_cpu(); 
-  sleep_disable();
-  digitalWrite(6, LOW);   // set the LED off
+  sleep_cpu(); // cpu goes to sleep here
+  sleep_disable(); // this is where we come back in again after sleeping
+  digitalWrite(PIN_SLEEP_LED, LOW);   // set the LED off
 }
 
 void wakeUpInterrupt(){
-  wakeup_flag = true;
+  if (!inSleep) return;
+  inSleep = false;
+  inWakeUp = true;
+}
+
+int seconds() {
+  return time % 60;
+}
+
+int minutes(){
+  return time / 60;
+}
+
+bool alarmRecentlyOff(){
+  return timeSinceAlarmOff < IGNORE_TIMER_SET_AFTER_ALARM_MS;
 }
