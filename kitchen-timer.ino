@@ -33,7 +33,10 @@
 // ignore user inputs for a bit after turning of the alarm as to not set a new time immediately
 #define IGNORE_TIMER_SET_AFTER_ALARM_MS  1000 
 // how long to wait without user input before going to sleep
-#define SLEEP_AFTER_MS                   3000 
+const float SLEEP_AFTER_MS   = 5000;
+// how long before the display starts to fade, hitting 0 as we go to sleep
+const float FADE_AFTER_MS    = 3000;
+const float FADE_DURATION_MS = SLEEP_AFTER_MS - FADE_AFTER_MS;
 
 Adafruit_IS31FL3731 matrix = Adafruit_IS31FL3731();
 Encoder rotaryEncoder = Encoder(PIN_ENCODER_A, PIN_ENCODER_B);
@@ -109,7 +112,7 @@ void swapBuffers(){
   matrix.setFrame(bufferSwapper ? 0 : 1);
   matrix.clear();
   matrix.setCursor(0, 7); 
-  if (bufferSwapper) matrix.drawPixel(15, 0, 255);
+  matrix.setTextColor(BRIGHTNESS);
 }
 
 void readRotaryEncoder(){
@@ -253,6 +256,13 @@ void refreshScreen(bool force){
 
   // we're idle, show a cute face
   if (time == 0) {
+    
+    // do a nice fade out before going to sleep
+    int time = timeSinceInput;
+    float fade = (float) (time - FADE_AFTER_MS)  / FADE_DURATION_MS;
+    if (fade < 0) fade = 0;
+    matrix.setTextColor(BRIGHTNESS * (1.0 - fade));
+
     long frame = currentFrame % 40;
     matrix.setCursor(4, 7);
     if (frame > 1) matrix.print("="); // eyes
