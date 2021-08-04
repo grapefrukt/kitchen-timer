@@ -1,6 +1,6 @@
 // can't make the encoder interrupts play nice with the wake up from sleep interrupt, so i have to disable them
 // #define ENCODER_DO_NOT_USE_INTERRUPTS
-#include <Encoder.h>
+#include "Encoder.h"
 #include <Bounce.h>
 #include <Wire.h>
 #include <Adafruit_GFX.h>
@@ -61,12 +61,6 @@ volatile bool inWakeUp = false;
 volatile bool inSleep = false;
 
 void setup() {
- 
-  delay(300);
-  
-  // Serial.begin(9600);
-  // Serial.println("This kitchen timer speaks serial. That's unusual.");
-
   // set all pins as outputs to save power (this is a teensy 2.0 thing)
   for (int i=0; i < 46; i++) {
     if (i == PIN_ENCODER_A) continue;
@@ -75,11 +69,6 @@ void setup() {
     if (i == PIN_SLEEP_SCREEN) continue;
     pinMode(i, OUTPUT);
   }
-
-  // set up an interrupt on one of the encoder pins (they both change as it turns, so one is enough)
-  // this can wake the teensy even if it's asleep
-  // attachInterrupt(digitalPinToInterrupt(PIN_ENCODER_A), wakeUpInterrupt, CHANGE);
-  // attachInterrupt(digitalPinToInterrupt(PIN_ENCODER_B), wakeUpInterrupt, CHANGE);
 
   // set up the pullup for the encoder push-button
   pinMode(PIN_ENCODER_BUTTON, INPUT_PULLUP);
@@ -318,10 +307,6 @@ void loop() {
 }
 
 void sleep() {
-  return; // NO SLEEP!
- 
-
-  
   digitalWrite(PIN_SLEEP_LED, HIGH);   // set the LED on
 
   inSleep = true;
@@ -341,6 +326,9 @@ void sleep() {
   sleep_disable(); // this is where we come back in again after sleeping
 }
 
+
+// this function gets called by the encoder class, i couln't make the interrupts play nice together
+// so i hacked it in there, this sets a flag that is then read by the loop() which brings everything back
 void wakeUpInterrupt(){
   if (!inSleep) return;
   inSleep = false;
