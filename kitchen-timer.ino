@@ -318,6 +318,16 @@ void loop() {
   if (timeSinceInput > SLEEP_AFTER_MS && time == 0 && alarmActive == 0) sleep();
 
   updateMelody();
+  idle();
+}
+
+void idle() {
+  set_sleep_mode(SLEEP_MODE_IDLE);
+  noInterrupts();
+  sleep_enable();
+  interrupts();
+  sleep_cpu();
+  sleep_disable();
 }
 
 void sleep() {
