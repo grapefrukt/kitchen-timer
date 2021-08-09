@@ -8,7 +8,7 @@ const int alarm[] = {
   NOTE_C8, 4, NOTE_B7, 4, NOTE_D8, 4, REST, 4,
 };
 
-MELODY(alarm, 900, 9)
+MELODY(alarm, 900, 10)
 
 const int timer_start[] = {
   NOTE_C6, 4, NOTE_D6, 4, REST, 4,
