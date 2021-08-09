@@ -1,5 +1,3 @@
-// can't make the encoder interrupts play nice with the wake up from sleep interrupt, so i have to disable them
-// #define ENCODER_DO_NOT_USE_INTERRUPTS
 #include "Encoder.h"
 #include <Bounce.h>
 #include <Wire.h>
@@ -17,6 +15,8 @@
 #define PIN_ENCODER_BUTTON 19
 #define PIN_SLEEP_LED       6
 #define PIN_SLEEP_SCREEN    17
+
+// #define USE_SLEEP_LED
 
 // useful to make the timer run faster
 #define MS_IN_A_SECOND 1000
@@ -84,8 +84,12 @@ void setup() {
 
 void wakeUp(){
   inWakeUp = false;
-  
+
+  #ifdef USE_SLEEP_LED
   digitalWrite(PIN_SLEEP_LED, LOW);   // set the LED off
+  #endif
+
+  // wake up the screen
   digitalWrite(PIN_SLEEP_SCREEN, HIGH);
    
   matrix.setTextSize(1);
@@ -317,8 +321,14 @@ void loop() {
 }
 
 void sleep() {
-  digitalWrite(PIN_SLEEP_LED, HIGH);   // set the LED on
+  #ifdef USE_SLEEP_LED
+    digitalWrite(PIN_SLEEP_LED, HIGH);   // set the LED on
+  #endif
 
+  // make sure melodies are stopped, we don't want to start playing anything when we wake up
+  stopMelody();
+
+  // set the sleep flag, this makes the wakeUpInterrupt function actually trigger the wakeup once called
   inSleep = true;
 
   // setting the pin mode triggers some kind of sleep thing on the screen, so i only do it here
