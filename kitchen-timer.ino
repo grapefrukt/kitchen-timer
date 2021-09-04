@@ -10,11 +10,11 @@
 #include "music.h"
 #include "music_data.h"
 
-#define PIN_ENCODER_A       2
-#define PIN_ENCODER_B       3
-#define PIN_ENCODER_BUTTON 19
+#define PIN_ENCODER_A       7
+#define PIN_ENCODER_B       8
+#define PIN_ENCODER_BUTTON  13
 #define PIN_SLEEP_LED       6
-#define PIN_SLEEP_SCREEN    17
+#define PIN_SLEEP_SCREEN    12
 
 // #define USE_SLEEP_LED
 
@@ -26,7 +26,7 @@
 #define BRIGHTNESS_EXTRA 32
 
 // how long to sound the alarm, after this, we just give up and go back to sleep
-#define ALARM_DURATION_SECONDS 30
+#define ALARM_DURATION_SECONDS 60
 
 // how long to wait after user input stops before starting the timer
 #define WAIT_AFTER_INPUT_MS              1000
@@ -42,9 +42,12 @@ Adafruit_IS31FL3731 matrix = Adafruit_IS31FL3731();
 Encoder rotaryEncoder = Encoder(PIN_ENCODER_A, PIN_ENCODER_B);
 Bounce  pushbutton    = Bounce(PIN_ENCODER_BUTTON, 10);  // 10 ms debounce
 
+bool buttonDown = false;
+
 elapsedMillis timerSeconds;
 elapsedMillis timeSinceInput;
 elapsedMillis timeSinceAlarmOff;
+elapsedMillis timeSinceButtonDown;
 
 // the main time keeping variable
 int time = 0;
@@ -173,15 +176,26 @@ void onRotary(int delta, int position){
   refreshScreen(true);
 }
 
-void onButton(){
-  if (alarmActive) dismissAlarm();
-  else time = 2;
+void onButtonDown(){
+  timeSinceInput = 0;
+  
+  if (alarmActive){
+    dismissAlarm();
+    return;
+  }
+  timeSinceButtonDown = 0;
+  buttonDown = true;
+}
+
+void onButtonUp(){
+  buttonDown = false;
   timeSinceInput = 0;
 }
 
 void dismissAlarm(){
   alarmActive = 0;
   timeSinceAlarmOff = 0;
+  time = 0;
   playMelody(melody_timer_dismiss);
   refreshScreen();
 }
@@ -252,8 +266,8 @@ void refreshScreen(bool force){
 
   // alarm's just been turned off, show a little confirm message
   if (alarmRecentlyOff()) {
-    matrix.setCursor(4, 7);
-    matrix.print("ok");
+    matrix.setCursor(2, 7);
+    matrix.print("off");
     swapBuffers();
     return;
   }
@@ -307,11 +321,19 @@ void loop() {
   if (inWakeUp) wakeUp();
 
   readRotaryEncoder();
-  if (pushbutton.update() && pushbutton.fallingEdge()) onButton();
+  if (pushbutton.update()){
+    if (pushbutton.fallingEdge()) onButtonDown();
+    if (pushbutton.risingEdge())  onButtonUp();
+  }
 
   if (timerSeconds >= MS_IN_A_SECOND) {
     onTick();
     timerSeconds -= MS_IN_A_SECOND;
+  }
+
+  if (buttonDown && timeSinceButtonDown > 1000) {
+    dismissAlarm();
+    onButtonUp();
   }
 
   if (alarmActive || alarmRecentlyOff() || time == 0) refreshScreen();
@@ -337,6 +359,9 @@ void sleep() {
 
   // make sure melodies are stopped, we don't want to start playing anything when we wake up
   stopMelody();
+
+  // reset the button down flag too, just to avoid any funny business
+  buttonDown = false;
 
   // set the sleep flag, this makes the wakeUpInterrupt function actually trigger the wakeup once called
   inSleep = true;
