@@ -12,9 +12,9 @@
 
 #define PIN_ENCODER_A       7
 #define PIN_ENCODER_B       8
-#define PIN_ENCODER_BUTTON  13
+#define PIN_ENCODER_BUTTON  16
 #define PIN_SLEEP_LED       6
-#define PIN_SLEEP_SCREEN    12
+#define PIN_SLEEP_SCREEN    9
 
 // #define USE_SLEEP_LED
 
@@ -124,7 +124,7 @@ void swapBuffers(){
 
 void readRotaryEncoder(){
   // read the encoder
-  long newPosition = rotaryEncoder.read();
+  long newPosition = -rotaryEncoder.read();
   // look at how far we've moved since last update
   int delta = newPosition - encoderPosition;
 
