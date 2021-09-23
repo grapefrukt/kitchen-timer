@@ -2,6 +2,8 @@
 ![a kitchen timer, sorry about the dust](assets/portrait.jpg?raw=true)
 The summer of 2021 I finally got fed up with my crappy ikea kitchen timer and decided to build my own. 
 
+You can find a [build log in this Twitter thread](https://twitter.com/grapefrukt/status/1417568865563852805). 
+
 Here's the bill of materials I ended up with:   
 [Teensy 2.0](https://www.adafruit.com/product/199)
 
