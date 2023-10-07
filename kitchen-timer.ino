@@ -38,6 +38,8 @@ const float SLEEP_AFTER_MS   = 5000;
 const float FADE_AFTER_MS    = 3000;
 const float FADE_DURATION_MS = SLEEP_AFTER_MS - FADE_AFTER_MS;
 
+#define CLEAR_TICKS_AFTER_MS 750
+
 Adafruit_IS31FL3731 matrix = Adafruit_IS31FL3731();
 Encoder rotaryEncoder = Encoder(PIN_ENCODER_A, PIN_ENCODER_B);
 Bounce  pushbutton    = Bounce(PIN_ENCODER_BUTTON, 10);  // 10 ms debounce
@@ -46,6 +48,7 @@ bool buttonDown = false;
 
 elapsedMillis timerSeconds;
 elapsedMillis timeSinceInput;
+elapsedMillis timeSinceTick;
 elapsedMillis timeSinceAlarmOff;
 elapsedMillis timeSinceButtonDown;
 
@@ -122,27 +125,32 @@ void swapBuffers(){
   matrix.setTextColor(BRIGHTNESS);
 }
 
+int ticks = 0;
 void readRotaryEncoder(){
-  // read the encoder
-  long newPosition = -rotaryEncoder.read();
-  // look at how far we've moved since last update
-  int delta = newPosition - encoderPosition;
+  int delta = -rotaryEncoder.readAndReset();
+  // sometimes this delta is a suspiciously large number, like 5, i suspect this is the encoder being bad. 
+  // in practice it seems entirely okay to clamp this to 1/-1
+  if (delta >  1) delta =  1;
+  if (delta < -1) delta = -1;
 
-  int direction = delta > 0 ? 1 : -1;
-  delta = abs(delta);
+  // because one "step" on the encoder is four ticks, it will sometimes become offset by a tick or two
+  // this will manifest as the timer jumping in a strange fashion. this has gotten worse as the encoder has 
+  // been getting worn out, the way i fix this is to reset the tick counter if there's been no input for a short while
+  // this assumes that if the encoder is still, it's in one of the detents
+  if (timeSinceTick > CLEAR_TICKS_AFTER_MS) ticks = 0;
+  timeSinceTick = 0;
   
+  ticks += delta;
+
   // one "step" is four ticks, so we only move if we're three+ ticks past our last position
-  if (delta < 3) return;
-  int ticks = 0;
+  if (ticks < 3 && ticks > -3) return;
   
-  // update the old position, make sure this stays on multiples of four to match the encoder
-  while (delta > 0) {
-    encoderPosition += direction * 4;
-    delta -= 4;
-    ticks++;
-  }
+  int direction = delta > 0 ? 1 : -1;
+  encoderPosition += direction;
+  
   // finally, call the onRotary function to tell it we've moved
-  onRotary(ticks * direction, encoderPosition >> 2);
+  onRotary(direction, encoderPosition >> 2);
+  ticks = 0;
 }
 
 void onRotary(int delta, int position){
