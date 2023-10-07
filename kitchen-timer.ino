@@ -128,22 +128,24 @@ void swapBuffers(){
 int ticks = 0;
 void readRotaryEncoder(){
   int delta = -rotaryEncoder.readAndReset();
-  // sometimes this delta is a suspiciously large number, like 5, i suspect this is the encoder being bad. 
-  // in practice it seems entirely okay to clamp this to 1/-1
-  if (delta >  1) delta =  1;
-  if (delta < -1) delta = -1;
-
+  if (delta == 0) return;
+    
   // because one "step" on the encoder is four ticks, it will sometimes become offset by a tick or two
   // this will manifest as the timer jumping in a strange fashion. this has gotten worse as the encoder has 
   // been getting worn out, the way i fix this is to reset the tick counter if there's been no input for a short while
   // this assumes that if the encoder is still, it's in one of the detents
-  if (timeSinceTick > CLEAR_TICKS_AFTER_MS) ticks = 0;
-  timeSinceTick = 0;
+  if (timeSinceTick > CLEAR_TICKS_AFTER_MS && ticks != 0){
+    // Serial.print("timeouted ");
+    // Serial.print(ticks);
+    // Serial.println("");
+    ticks = 0;
+  }
   
+  timeSinceTick = 0;
   ticks += delta;
 
-  // one "step" is four ticks, so we only move if we're three+ ticks past our last position
-  if (ticks < 3 && ticks > -3) return;
+  // one "step" is four ticks, so we only move if we're four+ ticks past our last position
+  if (ticks < 4 && ticks > -4) return;
   
   int direction = delta > 0 ? 1 : -1;
   encoderPosition += direction;
@@ -151,6 +153,7 @@ void readRotaryEncoder(){
   // finally, call the onRotary function to tell it we've moved
   onRotary(direction, encoderPosition >> 2);
   ticks = 0;
+  //Serial.println("tick!");
 }
 
 void onRotary(int delta, int position){
