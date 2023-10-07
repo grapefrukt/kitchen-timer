@@ -339,7 +339,8 @@ void loop() {
     timerSeconds -= MS_IN_A_SECOND;
   }
 
-  if (buttonDown && timeSinceButtonDown > 1000) {
+  // if the button is down, we instantly dismiss any alarm, if it's just the timer, we wait for one second first
+  if (buttonDown && ((time > 0 && timeSinceButtonDown > 1000) || alarmActive)) {
     dismissAlarm();
     onButtonUp();
   }
