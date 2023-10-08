@@ -10,6 +10,10 @@ int noteDuration = 0;
 
 elapsedMillis musicTimer;
 
+bool isPlayingMelody(){
+  return index >= 0;
+}
+
 void updateMelody(){
   if ((int) musicTimer < noteDuration) return;
   if (index < 0) return;

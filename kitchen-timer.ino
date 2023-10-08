@@ -28,6 +28,9 @@
 // how long to sound the alarm, after this, we just give up and go back to sleep
 #define ALARM_DURATION_SECONDS 60
 
+// any remaining ticks on the rotary will be cleared after this long (ms)
+#define CLEAR_TICKS_AFTER_MS 750
+
 // how long to wait after user input stops before starting the timer
 #define WAIT_AFTER_INPUT_MS              1000
 // ignore user inputs for a bit after turning of the alarm as to not set a new time immediately
@@ -38,7 +41,19 @@ const float SLEEP_AFTER_MS   = 5000;
 const float FADE_AFTER_MS    = 3000;
 const float FADE_DURATION_MS = SLEEP_AFTER_MS - FADE_AFTER_MS;
 
-#define CLEAR_TICKS_AFTER_MS 750
+
+enum State {
+  IDLE,
+  SET_TIMER,
+  TIMER,
+  ALARM,
+  ALARM_OFF_COOLDOWN,
+  VIEW_TOTAL,
+  MUSIC,
+};
+
+State state = IDLE;
+elapsedMillis timeInState;
 
 Adafruit_IS31FL3731 matrix = Adafruit_IS31FL3731();
 Encoder rotaryEncoder = Encoder(PIN_ENCODER_A, PIN_ENCODER_B);
@@ -49,16 +64,15 @@ bool buttonDown = false;
 elapsedMillis timerSeconds;
 elapsedMillis timeSinceInput;
 elapsedMillis timeSinceTick;
-elapsedMillis timeSinceAlarmOff;
 elapsedMillis timeSinceButtonDown;
 
 // the main time keeping variable
 int time = 0;
+// this stores the total time counted for this "session"
+int timeTotal = 0;
+
 // this is used for the double buffering of the display, swaps between 0/1 each update
 bool bufferSwapper = true;
-
-// is the alarm active? is set to the number of seconds the alarm will sound and decrements until zero
-int alarmActive = 0;
 
 // keep track of where the encoder was last update
 long encoderPosition = 0;
@@ -105,7 +119,7 @@ void wakeUp(){
   swapBuffers();
 
   timeSinceInput = 0;
-  timeSinceAlarmOff = IGNORE_TIMER_SET_AFTER_ALARM_MS;
+  setState(ALARM_OFF_COOLDOWN);
   refreshScreen();
 }
 
@@ -160,13 +174,15 @@ void onRotary(int delta, int position){
   timeSinceInput = 0;
 
   // if the alarm is going off, the knob won't change anything
-  if (alarmActive){
+  if (state == ALARM){
     dismissAlarm();
     return;
   }
 
   // if we recently turned off the alarm, ignore inputs for a bit
-  if (alarmRecentlyOff()) return;
+  if (state == ALARM_OFF_COOLDOWN) return;
+
+  setState(SET_TIMER);
 
   const int volume = 5;
   const int duration = 5;
@@ -174,15 +190,21 @@ void onRotary(int delta, int position){
   if (delta > 0) toneAC(position % 2 == 0 ? NOTE_C7 : NOTE_D7, volume, duration, background);
   else if (time > 0) toneAC(position % 2 == 0 ? NOTE_C7 : NOTE_B6, volume, duration, background);
 
+  // if the counter is at zero, we also reset the timeTotal counter to make this a new "session"
+  if (time == 0) timeTotal = 0;
+
   // 30 second steps up to 5 minutes, then 1 minute steps
   if (time < 5 * 60) {
     time += delta * 30;
+    timeTotal += delta * 30;
   } else {
-    time += delta * 60;  
+    time += delta * 60;
+    timeTotal += delta * 60;
   }
   
   // don't go below zero
   if (time < 0) time = 0;
+  if (timeTotal < 0) timeTotal = 0;
   
   refreshScreen(true);
 }
@@ -190,11 +212,11 @@ void onRotary(int delta, int position){
 void onButtonDown(){
   timeSinceInput = 0;
   
-  if (alarmActive){
+  if (state == ALARM){
     dismissAlarm();
     return;
   }
-  timeSinceButtonDown = 0;
+  
   buttonDown = true;
 }
 
@@ -204,31 +226,21 @@ void onButtonUp(){
 }
 
 void dismissAlarm(){
-  alarmActive = 0;
-  timeSinceAlarmOff = 0;
+  setState(ALARM_OFF_COOLDOWN);
   time = 0;
   playMelody(melody_timer_dismiss);
   refreshScreen();
 }
 
-bool waitOnLastFrame = false;
-void onTick(){
-  if (alarmActive) onAlarm(false);
+void onSecond(){
+  if (state == ALARM) onAlarm(false);
   if (time == 0) {
     refreshScreen();
     return;
   }
 
-  // don't count time when the user is inputting
-  if (timeSinceInput < WAIT_AFTER_INPUT_MS){
-    waitOnLastFrame = true;
-    return;
-  } else if (waitOnLastFrame){
-    onStartTimer();
-    waitOnLastFrame = false;
-    return;
-  }
-   
+  if (state != TIMER) return;
+    
   time -= 1;
   if (time < 0) time = 0;
 
@@ -238,15 +250,9 @@ void onTick(){
 }
 
 void onAlarm(bool setActive){
-  if (setActive) alarmActive = ALARM_DURATION_SECONDS;
-  else alarmActive--;
-  
-  if (alarmActive % 2 == 1) return;
+  if (setActive) setState(ALARM);
+  if ((timeInState / 1000) % 2 == 1) return;
   playMelody(melody_alarm);
-}
-
-void onStartTimer(){
-  playMelody(melody_timer_start);
 }
 
 void refreshScreen(){
@@ -259,7 +265,7 @@ void refreshScreen(bool force){
   lastFrame = currentFrame;
   
   // play alarm animation
-  if (alarmActive){
+  if (state == ALARM){
     int frameHalf = currentFrame / 2;
     int frameHalfOffset = currentFrame / 2 + 50;
 
@@ -276,7 +282,7 @@ void refreshScreen(bool force){
   }
 
   // alarm's just been turned off, show a little confirm message
-  if (alarmRecentlyOff()) {
+  if (state == ALARM_OFF_COOLDOWN) {
     matrix.setCursor(2, 7);
     matrix.print("off");
     swapBuffers();
@@ -284,8 +290,7 @@ void refreshScreen(bool force){
   }
 
   // we're idle, show a cute face
-  if (time == 0) {
-    
+  if (state == IDLE) {
     // do a nice fade out before going to sleep
     int time = timeSinceInput;
     float fade = (float) (time - FADE_AFTER_MS)  / FADE_DURATION_MS;
@@ -304,25 +309,27 @@ void refreshScreen(bool force){
   }
 
   // timer is active, show the timer digits
-  if (minutes() > 0) {
-    matrix.print(minutes());
-
-    if (minutes() > 9){
-      matrix.print("m"); 
-    } else {
-      matrix.print(":");
+  if (state == TIMER || state == SET_TIMER) {
+    if (minutes() > 0) {
+      matrix.print(minutes());
+  
+      if (minutes() > 9){
+        matrix.print("m"); 
+      } else {
+        matrix.print(":");
+      }
     }
-  }
-  
-  if (seconds() < 10) matrix.print(0);
-  matrix.print(seconds());
-  if (minutes() == 0) matrix.print("s");
-  
-  if (seconds() > 0) {
-    const int barY = 8;
-    int lastBarPixelX = seconds() / 4;
-    matrix.drawLine(0, barY, lastBarPixelX, barY, BRIGHTNESS);
-    matrix.drawLine(lastBarPixelX + 1, barY, lastBarPixelX + 1, barY, seconds() % 2 == 0 ? BRIGHTNESS_EXTRA : BRIGHTNESS_HALF);
+
+    if (seconds() > 0 && seconds() < 10) matrix.print(0);
+    matrix.print(seconds());
+    if (minutes() == 0) matrix.print("s");
+    
+    if (seconds() > 0) {
+      const int barY = 8;
+      int lastBarPixelX = seconds() / 4;
+      matrix.drawLine(0, barY, lastBarPixelX, barY, BRIGHTNESS);
+      matrix.drawLine(lastBarPixelX + 1, barY, lastBarPixelX + 1, barY, seconds() % 2 == 0 ? BRIGHTNESS_EXTRA : BRIGHTNESS_HALF);
+    }
   }
   
   swapBuffers();
@@ -336,23 +343,81 @@ void loop() {
     if (pushbutton.fallingEdge()) onButtonDown();
     if (pushbutton.risingEdge())  onButtonUp();
   }
+  if (!buttonDown) timeSinceButtonDown = 0;
 
   if (timerSeconds >= MS_IN_A_SECOND) {
-    onTick();
+    onSecond();
     timerSeconds -= MS_IN_A_SECOND;
   }
 
-  // if the button is down, we instantly dismiss any alarm, if it's just the timer, we wait for one second first
-  if (buttonDown && ((time > 0 && timeSinceButtonDown > 1000) || alarmActive)) {
-    dismissAlarm();
+  switch(state) {
+    case IDLE: loopIdle();
+    break;
+    case SET_TIMER: loopSetTimer();
+    break;
+    case TIMER: loopTimer();
+    break;
+    case ALARM: loopAlarm();
+    break;
+    case ALARM_OFF_COOLDOWN: loopAlarmOffCooldown();
+    break;
+    case VIEW_TOTAL: loopViewTotal();
+    break;
+    case MUSIC: loopMusic();
+  }
+  
+  updateMelody();
+  idle();
+}
+
+void loopIdle(){
+  refreshScreen();
+  if (buttonDown && timeSinceButtonDown > 3000){
+    playMelody(melody_nevergonnagive);
     onButtonUp();
   }
 
-  if (alarmActive || alarmRecentlyOff() || time == 0) refreshScreen();
-  if (timeSinceInput > SLEEP_AFTER_MS && time == 0 && alarmActive == 0) sleep();
+  if (timeSinceInput > SLEEP_AFTER_MS) sleep();
+}
 
-  updateMelody();
-  idle();
+void loopSetTimer(){
+  if (timeSinceInput < WAIT_AFTER_INPUT_MS) return;
+  if (time > 0){
+    playMelody(melody_timer_start);
+    setState(TIMER);
+  } else {
+    playMelody(melody_timer_dismiss);
+    setState(IDLE);
+  }
+  // we reset this here to make the delay until the timer ticks consistent
+  timerSeconds = 700;
+}
+
+void loopTimer(){
+
+}
+
+void loopAlarm(){
+  // if the button is down, we instantly dismiss any alarm, if it's just the timer, we wait for one second first
+  if (buttonDown) {
+    dismissAlarm();
+    onButtonUp();
+  }
+  refreshScreen();
+}
+
+void loopAlarmOffCooldown(){
+  refreshScreen();
+  if (timeInState < IGNORE_TIMER_SET_AFTER_ALARM_MS) return;
+  setState(IDLE);
+}
+
+void loopViewTotal(){
+  
+}
+
+void loopMusic(){
+  
 }
 
 void idle() {
@@ -365,6 +430,8 @@ void idle() {
 }
 
 void sleep() {
+  return;
+  
   #ifdef USE_SLEEP_LED
     digitalWrite(PIN_SLEEP_LED, HIGH);   // set the LED on
   #endif
@@ -393,7 +460,6 @@ void sleep() {
   sleep_disable(); // this is where we come back in again after sleeping
 }
 
-
 // this function gets called by the encoder class, i couln't make the interrupts play nice together
 // so i hacked it in there, this sets a flag that is then read by the loop() which brings everything back
 void wakeUpInterrupt(){
@@ -411,9 +477,26 @@ int minutes(){
 }
 
 long frame() {
-  return millis() / 100;
+  return millis() / (long) 100;
 }
 
-bool alarmRecentlyOff(){
-  return timeSinceAlarmOff < IGNORE_TIMER_SET_AFTER_ALARM_MS;
+void setState(State newState){
+  if (state == newState) return;
+  state = newState;
+  timeInState = 0;
+  switch(state) {
+    case IDLE: Serial.println("IDLE");
+    break;
+    case SET_TIMER: Serial.println("SET_TIMER");
+    break;
+    case TIMER: Serial.println("TIMER");
+    break;
+    case ALARM: Serial.println("ALARM");
+    break;
+    case ALARM_OFF_COOLDOWN: Serial.println("ALARM_OFF_COOLDOWN");
+    break;
+    case VIEW_TOTAL: Serial.println("VIEW_TOTAL");
+    break;
+    case MUSIC: Serial.println("MUSIC");
+  }
 }

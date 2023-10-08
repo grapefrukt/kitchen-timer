@@ -14,5 +14,6 @@ typedef struct {
 void playMelody(Melody melody);
 void updateMelody();
 void stopMelody();
+bool isPlayingMelody();
 
 #endif
