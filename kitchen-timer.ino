@@ -35,6 +35,8 @@
 #define WAIT_AFTER_INPUT_MS              1000
 // ignore user inputs for a bit after turning of the alarm as to not set a new time immediately
 #define IGNORE_TIMER_SET_AFTER_ALARM_MS  1000 
+// how long to wait in the view total state
+#define WAIT_WHILE_VIEW_TOTAL_MS         2000 
 // how long to wait without user input before going to sleep
 const float SLEEP_AFTER_MS   = 5000;
 // how long before the display starts to fade, hitting 0 as we go to sleep
@@ -216,6 +218,11 @@ void onButtonDown(){
     dismissAlarm();
     return;
   }
+
+  if (state == IDLE || state == TIMER){
+    setState(VIEW_TOTAL);
+    return;
+  }
   
   buttonDown = true;
 }
@@ -308,28 +315,41 @@ void refreshScreen(bool force){
     return;
   }
 
+  int seconds = -1;
+  int minutes = -1;
+
   // timer is active, show the timer digits
   if (state == TIMER || state == SET_TIMER) {
-    if (minutes() > 0) {
-      matrix.print(minutes());
+    seconds = time % 60;
+    minutes = time / 60;
+
+    if (seconds > 0) {
+      const int barY = 8;
+      int lastBarPixelX = seconds / 4;
+      matrix.drawLine(0, barY, lastBarPixelX, barY, BRIGHTNESS);
+      matrix.drawLine(lastBarPixelX + 1, barY, lastBarPixelX + 1, barY, seconds % 2 == 0 ? BRIGHTNESS_EXTRA : BRIGHTNESS_HALF);
+    }
+  }
+
+  if (state == VIEW_TOTAL){
+    seconds = timeTotal % 60;
+    minutes = timeTotal / 60;
+  }
+
+  if (state == TIMER || state == SET_TIMER || state == VIEW_TOTAL) {
+    if (minutes > 0) {
+      matrix.print(minutes);
   
-      if (minutes() > 9){
+      if (minutes > 9){
         matrix.print("m"); 
       } else {
         matrix.print(":");
       }
     }
 
-    if (seconds() > 0 && seconds() < 10) matrix.print(0);
-    matrix.print(seconds());
-    if (minutes() == 0) matrix.print("s");
-    
-    if (seconds() > 0) {
-      const int barY = 8;
-      int lastBarPixelX = seconds() / 4;
-      matrix.drawLine(0, barY, lastBarPixelX, barY, BRIGHTNESS);
-      matrix.drawLine(lastBarPixelX + 1, barY, lastBarPixelX + 1, barY, seconds() % 2 == 0 ? BRIGHTNESS_EXTRA : BRIGHTNESS_HALF);
-    }
+    if (seconds < 10) matrix.print(0);
+    matrix.print(seconds);
+    if (minutes == 0) matrix.print("s");
   }
   
   swapBuffers();
@@ -413,7 +433,13 @@ void loopAlarmOffCooldown(){
 }
 
 void loopViewTotal(){
-  
+  refreshScreen();
+  if (timeInState < WAIT_WHILE_VIEW_TOTAL_MS) return;
+  if (time > 0){
+    setState(TIMER);
+  } else {
+    setState(IDLE);
+  }
 }
 
 void loopMusic(){
@@ -466,14 +492,6 @@ void wakeUpInterrupt(){
   if (!inSleep) return;
   inSleep = false;
   inWakeUp = true;
-}
-
-int seconds() {
-  return time % 60;
-}
-
-int minutes(){
-  return time / 60;
 }
 
 long frame() {
