@@ -66,7 +66,7 @@ bool buttonDown = false;
 elapsedMillis timerSeconds;
 elapsedMillis timeSinceInput;
 elapsedMillis timeSinceTick;
-elapsedMillis timeSinceButtonDown;
+elapsedMillis timeButtonHold;
 
 // the main time keeping variable
 int time = 0;
@@ -150,12 +150,8 @@ void readRotaryEncoder(){
   // this will manifest as the timer jumping in a strange fashion. this has gotten worse as the encoder has 
   // been getting worn out, the way i fix this is to reset the tick counter if there's been no input for a short while
   // this assumes that if the encoder is still, it's in one of the detents
-  if (timeSinceTick > CLEAR_TICKS_AFTER_MS && ticks != 0){
-    // Serial.print("timeouted ");
-    // Serial.print(ticks);
-    // Serial.println("");
-    ticks = 0;
-  }
+  if (timeSinceTick > CLEAR_TICKS_AFTER_MS && ticks != 0) ticks = 0;
+  
   
   timeSinceTick = 0;
   ticks += delta;
@@ -169,7 +165,6 @@ void readRotaryEncoder(){
   // finally, call the onRotary function to tell it we've moved
   onRotary(direction, encoderPosition >> 2);
   ticks = 0;
-  //Serial.println("tick!");
 }
 
 void onRotary(int delta, int position){
@@ -363,7 +358,7 @@ void loop() {
     if (pushbutton.fallingEdge()) onButtonDown();
     if (pushbutton.risingEdge())  onButtonUp();
   }
-  if (!buttonDown) timeSinceButtonDown = 0;
+  if (!buttonDown) timeButtonHold = 0;
 
   if (timerSeconds >= MS_IN_A_SECOND) {
     onSecond();
@@ -392,11 +387,6 @@ void loop() {
 
 void loopIdle(){
   refreshScreen();
-  if (buttonDown && timeSinceButtonDown > 3000){
-    playMelody(melody_nevergonnagive);
-    onButtonUp();
-  }
-
   if (timeSinceInput > SLEEP_AFTER_MS) sleep();
 }
 
@@ -434,16 +424,22 @@ void loopAlarmOffCooldown(){
 
 void loopViewTotal(){
   refreshScreen();
-  if (timeInState < WAIT_WHILE_VIEW_TOTAL_MS) return;
+  if (timeButtonHold > 3000){
+    playMelody(melody_nevergonnagive);
+    setState(MUSIC);
+  }
+  if (buttonDown || timeInState < WAIT_WHILE_VIEW_TOTAL_MS) return;
   if (time > 0){
     setState(TIMER);
+    playMelody(melody_timer_start);
   } else {
+    playMelody(melody_timer_dismiss);
     setState(IDLE);
   }
 }
 
 void loopMusic(){
-  
+  if (!isPlayingMelody()) setState(IDLE);
 }
 
 void idle() {
