@@ -121,7 +121,7 @@ void wakeUp(){
   swapBuffers();
 
   timeSinceInput = 0;
-  setState(ALARM_OFF_COOLDOWN);
+  setState(IDLE);
   refreshScreen();
 }
 
@@ -452,8 +452,6 @@ void idle() {
 }
 
 void sleep() {
-  return;
-  
   #ifdef USE_SLEEP_LED
     digitalWrite(PIN_SLEEP_LED, HIGH);   // set the LED on
   #endif
